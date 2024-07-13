@@ -384,6 +384,8 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
         index_key = (const char *)&key;
         bool insert_ret = ih_->insert_entry(index_key, rid, txn_.get());  // 调用Insert
         ASSERT_EQ(insert_ret, true);
+
+        // Draw(buffer_pool_manager_.get(), "insert" + std::to_string(key) + ".dot");
     }
 
     // test GetValue

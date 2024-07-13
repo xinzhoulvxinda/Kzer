@@ -435,8 +435,8 @@ TEST_F(BPlusTreeTests, InsertAndDeleteTest2) {
  * @note lab2 计分：20 points
  */
 TEST_F(BPlusTreeTests, LargeScaleTest) {
-    const int order = 255;  // 若order太小，而插入数据过多，将会超出缓冲池
-    const int scale = 20000;
+    const int order = 255;  // 若order太小，而插入数据过多，将会超出缓冲池255
+    const int scale = 20000;//20000
 
     if (order >= 2 && order <= ih_->file_hdr_->btree_order_) {
         ih_->file_hdr_->btree_order_ = order;
@@ -457,7 +457,7 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
                 continue;
             }
             Rid rand_val = {.page_no = rand(), .slot_no = rand()};
-            printf("insert rand key=%d\n", rand_key);
+            // printf("insert rand key=%d\n", rand_key);
             bool insert_ret = ih_->insert_entry((const char *)&rand_key, rand_val, txn_.get());  // 调用Insert
             ASSERT_EQ(insert_ret, true);
             mock.insert(std::make_pair(rand_key, rand_val));
@@ -475,7 +475,7 @@ TEST_F(BPlusTreeTests, LargeScaleTest) {
                 it++;
             }
             int key = it->first;
-            printf("delete rand key=%d\n", key);
+            // printf("delete rand key=%d\n", key);
             if(key == 129){
                 std::cout << "now" ;
             }

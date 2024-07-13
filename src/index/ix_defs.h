@@ -130,7 +130,7 @@ public:
 class IxPageHdr {
 public:
     page_id_t next_free_page_no;    // unused
-    page_id_t parent;               // 父亲节点所在页面的叶号
+    page_id_t parent;               // 父亲节点所在页面的页号
     int num_key;                    // # current keys (always equals to #child - 1) 已插入的keys数量，key_idx∈[0,num_key)
     bool is_leaf;                   // 是否为叶节点
     page_id_t prev_leaf;            // previous leaf node's page_no, effective only when is_leaf is true
@@ -140,7 +140,7 @@ public:
 class Iid {
 public:
     int page_no;
-    int slot_no;
+    int slot_no;                    //第几个键值
 
     friend bool operator==(const Iid &x, const Iid &y) { return x.page_no == y.page_no && x.slot_no == y.slot_no; }
 

@@ -17,7 +17,7 @@ enum class Operation { FIND = 0, INSERT, DELETE };  // 三种操作：查找、�
 
 static const bool binary_search = false;
 
-inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
+inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {//比较key的大小关系
     switch (type) {
         case TYPE_INT: {
             int ia = *(int *)a;
@@ -56,7 +56,7 @@ class IxNodeHandle {
     Page *page;                     // 存储节点的页面
     IxPageHdr *page_hdr;            // page->data的第一部分，指针指向首地址，长度为sizeof(IxPageHdr)
     char *keys;                     // page->data的第二部分，指针指向首地址，长度为file_hdr->keys_size，每个key的长度为file_hdr->col_len
-    Rid *rids;                      // page->data的第三部分，指针指向首地址
+    Rid *rids;                      // page->data的第三部分，指针指向首地址，内节点存页号，页节点存元组
 
    public:
     IxNodeHandle() = default;
@@ -71,11 +71,11 @@ class IxNodeHandle {
 
     void set_size(int size) { page_hdr->num_key = size; }
 
-    int get_max_size() { return file_hdr->btree_order_ + 1; }
+    int get_max_size() { return file_hdr->btree_order_ + 1; }//页中最多能存几个key
 
     int get_min_size() { return get_max_size() / 2; }
 
-    int key_at(int i) { return *(int *)get_key(i); }
+    int key_at(int i) { return *(int *)get_key(i); }//取出第i个位置的key
 
     /* 得到第i个孩子结点的page_no */
     page_id_t value_at(int i) { return get_rid(i)->page_no; }
@@ -92,7 +92,7 @@ class IxNodeHandle {
 
     bool is_leaf_page() { return page_hdr->is_leaf; }
 
-    bool is_root_page() { return get_parent_page_no() == INVALID_PAGE_ID; }
+    bool is_root_page() { return get_parent_page_no() == INVALID_PAGE_ID; }//如果父节点页号无效则为根节点
 
     void set_next_leaf(page_id_t page_no) { page_hdr->next_leaf = page_no; }
 
@@ -108,7 +108,7 @@ class IxNodeHandle {
 
     void set_rid(int rid_idx, const Rid &rid) { rids[rid_idx] = rid; }
 
-    int lower_bound(const char *target) const;
+    int lower_bound(const char *target) const;//查小于该键值的key，用于区间查询
 
     int upper_bound(const char *target) const;
 
@@ -192,10 +192,10 @@ class IxIndexHandle {
                                 bool *root_is_latched = nullptr);
     bool adjust_root(IxNodeHandle *old_root_node);
 
-    void redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node, IxNodeHandle *parent, int index);
+    void redistribute(IxNodeHandle *neighbor_node, IxNodeHandle *node, IxNodeHandle *parent, int index);//借
 
     bool coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, IxNodeHandle **parent, int index,
-                  Transaction *transaction, bool *root_is_latched);
+                  Transaction *transaction, bool *root_is_latched);//合并
 
     Iid lower_bound(const char *key);
 

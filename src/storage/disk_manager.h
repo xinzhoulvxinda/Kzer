@@ -87,6 +87,8 @@ class DiskManager {
      */
     page_id_t get_fd2pageno(int fd) { return fd2pageno_[fd]; }
 
+    int get_fd2path(const std::string& path) { return path2fd_[path]; }
+
     static constexpr int MAX_FD = 8192;
 
    private:

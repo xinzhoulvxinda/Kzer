@@ -39,8 +39,47 @@ class UpdateExecutor : public AbstractExecutor {
     }
     std::unique_ptr<RmRecord> Next() override {
         
-        return nullptr;
-    }
+ // Update each rid from record file and index file
+        for (auto& rid : rids_) {
+            auto rec = fh_->get_record(rid, context_);
+            RmRecord record = *rec;
+            for (auto& set_clause : set_clauses_) {
+                auto lhs_col = tab_.get_col(set_clause.lhs.col_name);
+                memcpy(rec->data + lhs_col->offset, set_clause.rhs.raw->data, lhs_col->len);
+            }
+            // Remove old entry from index
+            for (size_t i = 0; i < tab_.indexes.size(); ++i) {
+                auto& index = tab_.indexes[i];
+                auto ih =
+                    sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                char* key = new char[index.col_tot_len];
+                int offset = 0;
+                for (int j = 0; j < index.col_num; ++j) {
+                    memcpy(key + offset, rec->data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                ih->delete_entry(key, context_->txn_);
+            }
+            // record a update operation into the transaction
+            WriteRecord* wr = new WriteRecord(WType::UPDATE_TUPLE, tab_name_, rid, record);
+            context_->txn_->append_write_record(wr);
+            // Update record in record file
+            fh_->update_record(rid, rec->data, context_);
+            // Insert new index into index
+            for (size_t i = 0; i < tab_.indexes.size(); ++i) {
+                auto& index = tab_.indexes[i];
+                auto ih =
+                    sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
+                char* key = new char[index.col_tot_len];
+                int offset = 0;
+                for (int j = 0; j < index.col_num; ++j) {
+                    memcpy(key + offset, rec->data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                ih->insert_entry(key, rid, context_->txn_);
+            }
+        }
+        return nullptr;    }
 
     Rid &rid() override { return _abstract_rid; }
 };
