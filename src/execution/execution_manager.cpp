@@ -130,6 +130,22 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
 // 执行select语句，select语句的输出除了需要返回客户端外，还需要写入output.txt文件中
 void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, std::vector<TabCol> sel_cols, 
                             Context *context) {
+    RmFileHandle * fh_;
+    auto temp = dynamic_cast<ProjectionExecutor*>(executorTreeRoot.get());
+    if(temp != nullptr)
+    {
+        auto &child = temp->get_child();
+        if(dynamic_cast<SeqScanExecutor*>(child.get()) != nullptr)
+        {
+            fh_ = child->get_fh();
+        }
+    }
+
+    if(context)
+    {
+        context->lock_mgr_->lock_shared_on_table(context->txn_, fh_->GetFd());
+    }
+
     std::vector<std::string> captions;
     captions.reserve(sel_cols.size());
     for (auto &sel_col : sel_cols) {

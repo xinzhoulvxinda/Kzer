@@ -35,6 +35,11 @@ class InsertExecutor : public AbstractExecutor {
         }
         fh_ = sm_manager_->fhs_.at(tab_name).get();
         context_ = context;
+
+        // 加表级写锁
+        // if (context) {
+        //     context_->lock_mgr_->lock_IX_on_table(context->txn_, fh_->GetFd());
+        // }
     };
 
     std::unique_ptr<RmRecord> Next() override {
@@ -51,6 +56,10 @@ class InsertExecutor : public AbstractExecutor {
         }
         // Insert into record file
         rid_ = fh_->insert_record(rec.data, context_);
+
+        // record a update operation into the transaction
+        WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE, tab_name_, rid_);
+        context_->txn_->append_write_record(wr);
         
         // Insert into index
         for(size_t i = 0; i < tab_.indexes.size(); ++i) {

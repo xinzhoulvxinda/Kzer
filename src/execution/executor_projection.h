@@ -38,33 +38,42 @@ class ProjectionExecutor : public AbstractExecutor {
         }
         len_ = curr_offset;
     }
-    //
-      bool is_end() const override { return prev_->is_end(); }
+
+    bool is_end() const override { return prev_->is_end(); }
 
     size_t tupleLen() const override { return len_; }
 
     const std::vector<ColMeta> &cols() const override { return cols_; }
-    //
 
-    void beginTuple() override {        prev_->beginTuple();
-}
+    const std::unique_ptr<AbstractExecutor> &get_child()
+    {
+        return prev_;
+    }
 
-    void nextTuple() override {  assert(!prev_->is_end());
-        prev_->nextTuple();}
+    void beginTuple() override {
+        prev_->beginTuple();
+    }
+
+    void nextTuple() override {
+        assert(!prev_->is_end());
+        prev_->nextTuple();
+    }
 
     std::unique_ptr<RmRecord> Next() override {
-   assert(!is_end());
-        auto &prev_cols = prev_->cols();
-        auto prev_rec = prev_->Next();
-        auto &proj_cols = cols_;
-        auto proj_rec = std::make_unique<RmRecord>(len_);
-        for (size_t proj_idx = 0; proj_idx < proj_cols.size(); proj_idx++) {
-            size_t prev_idx = sel_idxs_[proj_idx];
-            auto &prev_col = prev_cols[prev_idx];
-            auto &proj_col = proj_cols[proj_idx];
-            memcpy(proj_rec->data + proj_col.offset, prev_rec->data + prev_col.offset, prev_col.len);
+        assert(!prev_->is_end());
+        auto &prev_cols = prev_->cols();//原来记录中的字段
+        auto prev_rec = prev_->Next();//原来记录中的元组
+        auto proj_rec = std::make_unique<RmRecord>(len_);//投影记录
+
+        //将原来记录中元组对应的列写入投影记录proj_rec中
+        for(size_t proj_idx = 0; proj_idx < cols_.size(); proj_idx++)
+        {
+            auto &prev_col = prev_cols[sel_idxs_[proj_idx]];
+            memcpy(proj_rec->data + cols_[proj_idx].offset, 
+                prev_rec->data + prev_col.offset, prev_col.len);
         }
-        return proj_rec;    }
+        return proj_rec;
+    }
 
     Rid &rid() override { return _abstract_rid; }
 };

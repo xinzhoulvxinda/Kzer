@@ -24,12 +24,12 @@ def extract_index(test_file):
 def build():
     # change dir to root
     os.chdir("../../../")
-    # if os.path.exists("./build"):
-    #     os.system("rm -rf build")
-    # os.mkdir("./build")
+    if os.path.exists("./build"):
+        os.system("rm -rf build")
+    os.mkdir("./build")
     os.chdir("./build")
     os.system("cmake ..")
-    # os.system("make rmdb -j4")
+    os.system("make rmdb -j4")
     os.system("make query_test -j4")
     os.chdir("..")
     
@@ -51,7 +51,7 @@ def run(test_file):
     if os.path.exists(database_name):
         os.system("rm -rf " + database_name)
 
-    # os.system("./bin/rmdb " + database_name + "&")
+    os.system("./bin/rmdb " + database_name + "&")
     # The server takes a few seconds to establish the connection, so the client should wait for a while.
     time.sleep(3)
     ret = os.system("./bin/query_test " + test_file)
@@ -69,7 +69,7 @@ def run(test_file):
             continue
         num=ansDict.setdefault(line,0)
         ansDict[line]=num+1
-    my_answer = "../" + database_name + "/output.txt"
+    my_answer = database_name + "/output.txt"
     hand1 = open(my_answer,"r")
     for line in hand1 :
         line = line.strip('\n')
@@ -92,7 +92,7 @@ def run(test_file):
     print("finish kill")
     # delete database
     if test_index < 5:
-        os.system("rm -rf ./" + "../" + database_name)
+        os.system("rm -rf ./" + database_name)
         print("finish delete database")
     
     os.chdir("../../")

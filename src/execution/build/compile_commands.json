@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/user/lvxinda/share/Ubunt_share/execution/build",
+  "command": "/usr/bin/c++    -g   -o CMakeFiles/execution.dir/execution_manager.cpp.o -c /home/user/lvxinda/share/Ubunt_share/execution/execution_manager.cpp",
+  "file": "/home/user/lvxinda/share/Ubunt_share/execution/execution_manager.cpp"
+}
+]

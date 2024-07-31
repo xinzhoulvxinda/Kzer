@@ -4,7 +4,7 @@ insert into concurrency_test values (1, 'xiaohong', 90.0);
 insert into concurrency_test values (2, 'xiaoming', 95.0);
 insert into concurrency_test values (3, 'zhanghua', 88.5);
 
-txn1 4
+txn1 5
 t1a begin;
 t1b update concurrency_test set score = 100.0 where id = 2;
 t1c abort;

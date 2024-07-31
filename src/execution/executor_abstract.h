@@ -39,6 +39,8 @@ class AbstractExecutor {
     virtual bool is_end() const { return true; };
 
     virtual Rid &rid() = 0;
+    
+    virtual RmFileHandle* get_fh() const {};
 
     virtual std::unique_ptr<RmRecord> Next() = 0;
 

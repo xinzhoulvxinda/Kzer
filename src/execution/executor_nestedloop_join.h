@@ -42,26 +42,23 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
         fed_conds_ = std::move(conds);
 
     }
-    //
-     bool is_end() const override { return left_->is_end(); }
+
+    bool is_end() const override { return left_->is_end(); }
 
     size_t tupleLen() const override { return len_; }
 
     const std::vector<ColMeta> &cols() const override { return cols_; }
-    //
 
     void beginTuple() override {
-         left_->beginTuple();
-        if (left_->is_end()) {
-            return;
-        }
+        left_->beginTuple();
         right_->beginTuple();
-        while (!is_end()) {
-            if (eval_conds(cols_, fed_conds_, left_->Next().get(), right_->Next().get())) {
+        while(!is_end())
+        {
+            if(eval_conds(cols_, fed_conds_, left_->Next().get(), right_->Next().get()))
                 break;
-            }
             right_->nextTuple();
-            if (right_->is_end()) {
+            if(right_->is_end())
+            {
                 left_->nextTuple();
                 right_->beginTuple();
             }
@@ -70,72 +67,105 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
     }
 
     void nextTuple() override {
-          assert(!is_end());
         right_->nextTuple();
-        if (right_->is_end()) {
+        if(right_->is_end())
+        {
             left_->nextTuple();
             right_->beginTuple();
         }
-        while (!is_end()) {
-            if (eval_conds(cols_, fed_conds_, left_->Next().get(), right_->Next().get())) {
+        while(!is_end())
+        {
+            if(eval_conds(cols_, fed_conds_, left_->Next().get(), right_->Next().get()))
                 break;
-            }
             right_->nextTuple();
-            if (right_->is_end()) {
+            if(right_->is_end())
+            {
                 left_->nextTuple();
                 right_->beginTuple();
             }
         }
-        
     }
 
     std::unique_ptr<RmRecord> Next() override {
-    assert(!is_end());
         auto record = std::make_unique<RmRecord>(len_);
-        auto left_record = left_->Next();
-        auto right_record = right_->Next();
-        memcpy(record->data, left_record->data, left_record->size);
-        memcpy(record->data + left_record->size, right_record->data, right_record->size);
-        return record;    }
+        auto left_rec = left_->Next();
+        auto right_rec = right_->Next();
 
-    Rid &rid() override { return _abstract_rid; }
-    bool eval_cond(const std::vector<ColMeta> &rec_cols, const Condition &cond, const RmRecord *lrec,
-                   const RmRecord *rrec) {
-        auto lhs_col = get_col(rec_cols, cond.lhs_col);
-        char *lhs = lrec->data + lhs_col->offset;
-        char *rhs;
-        ColType rhs_type;
-        if (cond.is_rhs_val) {
-            rhs_type = cond.rhs_val.type;
-            rhs = cond.rhs_val.raw->data;
-        } else {
-            // rhs is a column
-            auto rhs_col = get_col(rec_cols, cond.rhs_col);
-            rhs_type = rhs_col->type;
-            rhs = rrec->data + rhs_col->offset - left_->tupleLen();
-        }
-        assert(rhs_type == lhs_col->type);
-        int cmp = ix_compare(lhs, rhs, rhs_type, lhs_col->len);
-        if (cond.op == OP_EQ) {
-            return cmp == 0;
-        } else if (cond.op == OP_NE) {
-            return cmp != 0;
-        } else if (cond.op == OP_LT) {
-            return cmp < 0;
-        } else if (cond.op == OP_GT) {
-            return cmp > 0;
-        } else if (cond.op == OP_LE) {
-            return cmp <= 0;
-        } else if (cond.op == OP_GE) {
-            return cmp >= 0;
-        } else {
-            throw InternalError("Unexpected op type");
-        }
+        memcpy(record->data, left_rec->data, left_rec->size);
+        memcpy(record->data + left_rec->size, right_rec->data, right_rec->size);
+        return record;
     }
 
-    bool eval_conds(const std::vector<ColMeta> &rec_cols, const std::vector<Condition> &conds, const RmRecord *lrec,
-                    const RmRecord *rrec) {
-        return std::all_of(conds.begin(), conds.end(),
-                           [&](const Condition &cond) { return eval_cond(rec_cols, cond, lrec, rrec); });
+    Rid &rid() override { return _abstract_rid; }
+
+    /**
+    * @description: 判断左面的元组和右面的元组是否满足连接条件
+    * @return {bool} true: 满足 , false: 不满足 
+    * @param {std::vector<ColMeta> &} rec_cols 连接后的元组的字段
+    * @param {Condition &} cond 谓词条件
+    * @param {RmRecord *} lrec 左元组的记录
+    * @param {RmRecord *} rrec 右元组的记录
+    */
+    bool eval_cond(const std::vector<ColMeta> &rec_cols, const Condition &cond, const RmRecord *lrec, const RmRecord *rrec)
+    {
+        //找到连接条件中左侧的字段（get_col函数可以检查左侧字段是否有效）
+        auto lhs_col = get_col(rec_cols, cond.lhs_col);
+
+        //得到该字段对应的值
+        char *lhs = lrec->data + lhs_col->offset;
+
+        //条件右侧的类型
+        ColType rhs_type;
+        //条件右侧的值
+        char *rhs;
+
+        //判断条件右侧
+        if(cond.is_rhs_val)//如果条件右端是值
+        {
+            rhs_type = cond.rhs_val.type;//条件右侧的类型
+            rhs = cond.rhs_val.raw->data;//条件右侧的值
+        }
+        else//如果条件右端是列名
+        {
+            auto rhs_col = get_col(rec_cols, cond.rhs_col);
+            rhs_type = rhs_col->type;
+            rhs = rrec->data + rhs_col->offset - left_->tupleLen();//条件右端列的值
+        }
+
+        //判断是否满足连接条件
+        int result = ix_compare(lhs, rhs, rhs_type, lhs_col->len);//比较左侧和右侧值的大小
+        if(cond.op == OP_EQ)
+            return result == 0;
+        else if(cond.op == OP_NE)
+            return result != 0;
+        else if(cond.op == OP_LT)
+            return result < 0;
+        else if(cond.op == OP_GT)
+            return result > 0;
+        else if(cond.op == OP_LE)
+            return result <= 0;
+        else if (cond.op == OP_GE)
+            return result >= 0;
+
+    }
+
+    /**
+    * @description: 判断元组是否满足所有谓词条件
+    * @return {bool} true: 满足 , false: 不满足 
+    * @param {std::vector<ColMeta> &} rec_cols 连接后的元组的字段
+    * @param {Condition &} cond 谓词条件
+    * @param {RmRecord *} lrec 左元组的记录
+    * @param {RmRecord *} rrec 右元组的记录
+    */
+    bool eval_conds(const std::vector<ColMeta> &rec_cols, const std::vector<Condition> &conds, const RmRecord *lrec, const RmRecord *rrec)
+    {
+        for(auto &cond: conds)
+        {
+            if(eval_cond(rec_cols, cond, lrec, rrec))
+                continue;
+            else
+                return false;
+        }
+        return true;
     }
 };

@@ -43,21 +43,32 @@ class SeqScanExecutor : public AbstractExecutor {
         context_ = context;
 
         fed_conds_ = conds_;
+
+        // if(context)
+        // {
+        //     context->lock_mgr_->lock_shared_on_table(context->txn_, fh_->GetFd());
+        // }
     }
-    //
+    
     bool is_end() const override { return scan_->is_end(); }
 
     size_t tupleLen() const override { return len_; }
 
     const std::vector<ColMeta> &cols() const override { return cols_; }
-    //
+
+    RmFileHandle* get_fh() const {
+        return fh_;
+    }
 
     /**
      * @brief 构建表迭代器scan_,并开始迭代扫描,直到扫描到第一个满足谓词条件的元组停止,并赋值给rid_
      *
      */
     void beginTuple() override {
-         scan_ = std::make_unique<RmScan>(fh_);
+        //构建表迭代器scan_
+        scan_ = std::make_unique<RmScan>(fh_);//此时指向第一个存放记录的位置
+
+        //开始迭代扫描
         for (; !scan_->is_end(); scan_->next()) {
             rid_ = scan_->rid();
             try {
@@ -69,7 +80,6 @@ class SeqScanExecutor : public AbstractExecutor {
                 std::cerr << e.what() << std::endl;
             }
         }
-        
     }
 
     /**
@@ -77,15 +87,13 @@ class SeqScanExecutor : public AbstractExecutor {
      *
      */
     void nextTuple() override {
-         assert(!is_end());
-        for (scan_->next(); !scan_->is_end(); scan_->next()) {
-            rid_ = scan_->rid();
-            auto rec = fh_->get_record(rid_, context_);
-            if (eval_conds(cols_, fed_conds_, rec.get())) {
+        for(scan_->next(); !scan_->is_end(); scan_->next())
+        {
+            rid_ = scan_->rid();//得到元组
+            //扫描到第一个谓词条件的元组停止
+            if(eval_conds(cols_, fed_conds_, fh_->get_record(rid_, context_).get()))
                 break;
-            }
         }
-        
     }
 
     /**
@@ -94,45 +102,81 @@ class SeqScanExecutor : public AbstractExecutor {
      * @return std::unique_ptr<RmRecord>
      */
     std::unique_ptr<RmRecord> Next() override {
-    assert(!is_end());
-        return fh_->get_record(rid_, context_);    }
-
-    Rid &rid() override { return rid_; }
-    bool eval_cond(const std::vector<ColMeta> &rec_cols, const Condition &cond, const RmRecord *rec) {
-        auto lhs_col = get_col(rec_cols, cond.lhs_col);
-        char *lhs = rec->data + lhs_col->offset;
-        char *rhs;
-        ColType rhs_type;
-        if (cond.is_rhs_val) {
-            rhs_type = cond.rhs_val.type;
-            rhs = cond.rhs_val.raw->data;
-        } else {
-            // rhs is a column
-            auto rhs_col = get_col(rec_cols, cond.rhs_col);
-            rhs_type = rhs_col->type;
-            rhs = rec->data + rhs_col->offset;
-        }
-        assert(rhs_type == lhs_col->type);
-        int cmp = ix_compare(lhs, rhs, rhs_type, lhs_col->len);
-        if (cond.op == OP_EQ) {
-            return cmp == 0;
-        } else if (cond.op == OP_NE) {
-            return cmp != 0;
-        } else if (cond.op == OP_LT) {
-            return cmp < 0;
-        } else if (cond.op == OP_GT) {
-            return cmp > 0;
-        } else if (cond.op == OP_LE) {
-            return cmp <= 0;
-        } else if (cond.op == OP_GE) {
-            return cmp >= 0;
-        } else {
-            throw InternalError("Unexpected op type");
-        }
+        assert(!is_end());
+        return fh_->get_record(rid_, context_);
     }
 
-    bool eval_conds(const std::vector<ColMeta> &rec_cols, const std::vector<Condition> &conds, const RmRecord *rec) {
-        return std::all_of(conds.begin(), conds.end(),
-                           [&](const Condition &cond) { return eval_cond(rec_cols, cond, rec); });
+    Rid &rid() override { return rid_; }
+
+    /**
+    * @description: 判断元组是否满足单个谓词条件
+    * @return {bool} true: 满足 , false: 不满足 
+    * @param {std::vector<ColMeta> &} rec_cols scan后生成的记录的字段
+    * @param {Condition &} cond 谓词条件
+    * @param {RmRecord *} rec scan后生成的记录
+    */
+    bool eval_cond(const std::vector<ColMeta> &rec_cols, const Condition &cond, const RmRecord *rec)
+    {
+        //需判断左侧字段是否有效和右侧值是否有效，根据测试文件得出
+
+
+        //找到谓词条件中的那个字段（get_col函数可以检查左侧字段是否有效）
+        auto lhs_col = get_col(rec_cols, cond.lhs_col);
+
+        //得到该字段对应的值
+        char *lhs = rec->data + lhs_col->offset;
+
+        //条件右侧的类型
+        ColType rhs_type;
+        //条件右侧的值
+        char *rhs;
+
+        //判断条件右侧
+        if(cond.is_rhs_val)//如果条件右端是值
+        {
+            rhs_type = cond.rhs_val.type;//条件右侧的类型
+            rhs = cond.rhs_val.raw->data;//条件右侧的值
+        }
+        else//如果条件右端是列名
+        {
+            auto rhs_col = get_col(rec_cols, cond.rhs_col);
+            rhs_type = rhs_col->type;
+            rhs = cond.rhs_val.raw->data;//此处可能有问题
+        }
+
+        //判断左侧字段是否满足条件
+        int result = ix_compare(lhs, rhs, rhs_type, lhs_col->len);//比较左侧和右侧值的大小
+        if(cond.op == OP_EQ)
+            return result == 0;
+        else if(cond.op == OP_NE)
+            return result != 0;
+        else if(cond.op == OP_LT)
+            return result < 0;
+        else if(cond.op == OP_GT)
+            return result > 0;
+        else if(cond.op == OP_LE)
+            return result <= 0;
+        else if (cond.op == OP_GE)
+            return result >= 0;
+
+    }
+
+    /**
+    * @description: 判断元组是否满足所有谓词条件
+    * @return {bool} true: 满足 , false: 不满足 
+    * @param {std::vector<ColMeta> &} rec_cols scan后生成的记录的字段
+    * @param {std::vector<Condition> &} conds 谓词条件
+    * @param {RmRecord *} rec scan后生成的记录
+    */
+    bool eval_conds(const std::vector<ColMeta> &rec_cols, const std::vector<Condition> &conds, const RmRecord *rec)
+    {
+        for(auto &cond: conds)
+        {
+            if(eval_cond(rec_cols, cond, rec))
+                continue;
+            else
+                return false;
+        }
+        return true;
     }
 };
