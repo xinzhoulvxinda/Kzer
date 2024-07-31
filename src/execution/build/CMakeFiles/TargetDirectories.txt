@@ -1,3 +1,0 @@
-/home/user/lvxinda/share/Ubunt_share/execution/build/CMakeFiles/rebuild_cache.dir
-/home/user/lvxinda/share/Ubunt_share/execution/build/CMakeFiles/edit_cache.dir
-/home/user/lvxinda/share/Ubunt_share/execution/build/CMakeFiles/execution.dir
